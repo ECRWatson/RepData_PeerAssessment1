@@ -5,21 +5,133 @@ output:
     keep_md: true
 ---
 
+## 1. Loading and preprocessing the data
 
-## Loading and preprocessing the data
+I will use `unzip()` and `read.csv()` to access the file, and `dplyr::as_tibble()` to format it.
 
+```{r, message = FALSE}
+library(dplyr)
+unzip("activity.zip")
+temp <- read.csv("activity.csv")
+activity <- as_tibble(temp)
+```
 
+---
 
-## What is mean total number of steps taken per day?
+## 2. What is mean total number of steps taken per day?
 
+### 2.1. Calculate total steps per day.
 
+I will use "dplyr" for this first task.
 
-## What is the average daily activity pattern?
+```{r}
+library(ggplot2)
+daily_steps <- activity %>%
+        group_by(date) %>%
+        summarise(total_steps = sum(steps))
+daily_steps
+```
 
+### 2.2. Make a histogram.
 
+I will use "ggplot2" to plot a histogram (remembering that histogram is a frequency plot with a continuous variable - in this case, total steps - organised into bins).
 
-## Imputing missing values
+```{r}
+ggplot(daily_steps) +
+        geom_histogram(mapping = aes(x = total_steps), binwidth = 500)
+```
 
+### 2.3. Calculate and report the mean and median steps per day.
+
+With the `daily_steps` tibble I can calculate mean and median values:
+
+```{r}
+summarise(daily_steps, mean_steps = mean(total_steps, na.rm = TRUE), median_steps = median(total_steps, na.rm = TRUE))
+```
+
+---
+
+## 3. What is the average daily activity pattern?
+
+### 3.1. Time series plot
+
+Find the mean number of steps per time interval using "dplyr", then graph it with "ggplot2".
+
+```{r}
+by_interval <- activity %>%
+        group_by(interval) %>%
+        summarise(mean_steps = mean(steps, na.rm = TRUE))
+ggplot(by_interval) +
+        geom_line(mapping = aes(x = interval, y = mean_steps))
+```
+
+### 3.2. Which 5 minute interval contains the maximum number of steps, on average?
+
+I can subset out the portion of the `by_interval` table containing this.
+
+```{r}
+by_interval[which(by_interval$mean_steps == max(by_interval$mean_steps)),]
+```
+The answer is therefore 835. 
+
+---
+
+## 4. Imputing missing values
+
+### 4.1. Calculate and report total number of missing values.
+
+I can use the `complete.cases()` function: the inverse will give us the total number of rows containing an `NA`.
+
+```{r}
+sum(!complete.cases(activity))
+```
+### 4.2. Devising a strategy for all the missing step values.
+
+I have chosen to use mean values for each interval, given these have been previously calculated and exist in the `by_interval' tibble. 
+
+```{r}
+by_interval
+```
+
+### 4.3. Creating a new dataset with the missing data filled in.
+
+The following code:
+
+1. Creates a copy of the original data frame, called `activity2`.
+2. Converts the data in the "steps" column to numeric.
+3. Uses a `for` loop to run through each row of the `activity2` data frame.
+4. Uses an `if` argument to identify all the NAs.
+    * If an NA is found, this value is then replaced with the mean value for the corresponding interval, as obtained from the `by_interval` tibble.
+
+```{r, cache = TRUE}
+activity2 <- as_tibble(temp)
+activity2$steps <- as.numeric(activity2$steps)
+for(i in 1:nrow(activity2)) {
+        if(is.na(activity2[i, "steps"])) {
+                activity2[i, "steps"] <- as.numeric(by_interval[which(by_interval$interval == as.integer(activity2[i, "interval"])),2])
+        } 
+}
+activity2
+```
+
+### 4.4. Making a histogram of total steps, and reporting mean and median steps for each data set.
+
+Firstly, create a table showing the total steps for the `activity2` data set.
+
+```{r}
+daily_steps2 <- activity2 %>%
+        group_by(date) %>%
+        summarise(total_steps2 = sum(steps))
+daily_steps2
+```
+
+Merge the `daily_steps` and `daily_steps2` tables together, and keep the merged data frame as a tibble.
+
+```{r}
+both_daily_steps <- as_tibble(merge(daily_steps, daily_steps2))
+```
+
+Then plot two histograms comparing 
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
